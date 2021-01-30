@@ -120,6 +120,9 @@ ynh_systemd_action --service_name=$app --action="start"
 #=================================================
 ynh_script_progression --message="Configuring permissions..." --time --weight=1
 
+# Remove auth header provided by ssowat or else drone is lost
+ynh_permission_url --permission "main" --auth_header=false
+
 # Make app public if necessary
 if [ $is_public -eq 1 ]
 then
