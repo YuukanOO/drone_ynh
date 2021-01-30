@@ -1,0 +1,19 @@
+#!/bin/bash
+
+#=================================================
+# GENERIC START
+#=================================================
+# IMPORT GENERIC HELPERS
+#=================================================
+
+source _common.sh
+source /usr/share/yunohost/helpers
+
+#=================================================
+# LOAD SETTINGS
+#=================================================
+ynh_script_progression --message="Loading installation settings..." --time --weight=1
+
+app=$YNH_APP_INSTANCE_NAME
+
+ynh_die --message="Operation not supported yet!"

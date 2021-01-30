@@ -1,0 +1,68 @@
+{
+  "name": "Drone",
+  "id": "drone",
+  "packaging_format": 1,
+  "description": {
+    "en": "Self-service Continuous Integration platform for busy development teams",
+    "fr": "Plateforme d'intégration continue pour équipes de développeurs occupées"
+  },
+  "version": "1.10.1~ynh1",
+  "url": "https://www.drone.io/",
+  "license": "free",
+  "maintainer": {
+    "name": "Julien Leicher",
+    "email": "julien@leicher.me",
+    "url": "https://julien.leicher.me"
+  },
+  "requirements": {
+    "yunohost": ">= 4.1.3"
+  },
+  "multi_instance": true,
+  "services": ["nginx"],
+  "arguments": {
+    "install": [
+      {
+        "name": "domain",
+        "type": "domain",
+        "ask": {
+          "en": "Choose a domain name for drone",
+          "fr": "Choisissez un nom de domaine pour drone"
+        },
+        "example": "example.com"
+      },
+	{
+		"name": "gitea_url",
+		"type": "string",
+		"ask": {
+			"en": "Url of the gitea server",
+			"fr": "Url du serveur gitea"
+		}
+	},
+	{
+		"name": "gitea_client_id",
+		"type": "string",
+		"ask": {
+			"en": "Client ID for gitea authentication",
+			"fr": "ID client pour la connexion à gitea"
+		}
+	},
+	{
+		"name": "gitea_client_secret",
+		"type": "string",
+		"ask": {
+			"en": "Client secret for gitea authentication",
+			"fr": "Secret client pour la connexion à gitea"
+		}
+	},
+      {
+        "name": "is_public",
+        "type": "boolean",
+        "ask": {
+          "en": "Is it a public application?",
+          "fr": "Est-ce une application publique ?"
+        },
+        "default": true
+      }
+    ]
+  }
+}

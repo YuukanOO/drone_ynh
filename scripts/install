@@ -1,0 +1,144 @@
+#!/bin/bash
+
+#=================================================
+# IMPORT GENERIC HELPERS
+#=================================================
+
+source _common.sh
+source /usr/share/yunohost/helpers
+
+app=$YNH_APP_INSTANCE_NAME
+final_path=/opt/yunohost/$app
+
+ynh_clean_setup () {
+	true
+}
+# Exit if an error occurs during the execution of the script
+ynh_abort_if_errors
+
+domain=$YNH_APP_ARG_DOMAIN
+is_public=$YNH_APP_ARG_IS_PUBLIC
+gitea_url=$YNH_APP_ARG_GITEA_URL
+gitea_client_id=$YNH_APP_ARG_GITEA_CLIENT_ID
+gitea_client_secret=$YNH_APP_ARG_GITEA_CLIENT_SECRET
+rpc_secret=$(ynh_string_random)
+
+#=================================================
+# APP REGISTRATION
+#=================================================
+ynh_script_progression --message="Registering web app..." --time --weight=1
+ynh_webpath_register --app $app --domain $domain --path_url "/"
+
+ynh_script_progression --message="Validating installation parameters..." --time --weight=1
+
+test ! -e "$final_path" || ynh_die --message="This path already contains a folder"
+
+sudo mkdir -p $final_path
+
+#=================================================
+# PORT FINDING
+#=================================================
+ynh_script_progression --message="Finding an available port..." --time --weight=1
+
+port=$(ynh_find_port --port=8095)
+
+#=================================================
+# STORING SETTINGS
+#=================================================
+ynh_script_progression --message="Storing installation settings..." --time --weight=1
+
+ynh_app_setting_set --app=$app --key=domain --value=$domain
+ynh_app_setting_set --app=$app --key=final_path --value=$final_path
+ynh_app_setting_set --app=$app --key=rpc_secret --value=$rpc_secret
+ynh_app_setting_set --app=$app --key=gitea_url --value=$gitea_url
+ynh_app_setting_set --app=$app --key=gitea_client_id --value=$gitea_client_id
+ynh_app_setting_set --app=$app --key=gitea_client_secret --value=$gitea_client_secret
+ynh_app_setting_set --app=$app --key=port --value=$port
+
+#=================================================
+# DOCKER & COMPOSE INSTALLATION
+#=================================================
+if ! [ -x "$(command -v docker)" ]; then
+	ynh_script_progression --message="Installing Docker..." --time --weight=1
+	curl -fsSL https://get.docker.com -o get-docker.sh
+	sudo sh get-docker.sh
+fi
+
+if ! [ -x "$(command -v docker-compose)" ]; then
+	ynh_script_progression --message="Installing Docker compose..." --time --weight=1
+	sudo curl -L "https://github.com/docker/compose/releases/download/1.28.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+	sudo chmod +x /usr/local/bin/docker-compose
+fi
+
+#=================================================
+# DOCKER-COMPOSE.YML GENERATION
+#=================================================
+ynh_script_progression --message="Copying docker-compose file to $final_path..." --time --weight=1
+docker_compose_path="$final_path/docker-compose.yml"
+sudo cp ../conf/docker-compose.yml $final_path
+
+ynh_replace_string --match_string="__PORT__" --replace_string="$port" --target_file=$docker_compose_path
+ynh_replace_string --match_string="__RPC_SECRET__" --replace_string="$rpc_secret" --target_file=$docker_compose_path
+ynh_replace_string --match_string="__DOMAIN__" --replace_string="$domain" --target_file=$docker_compose_path
+ynh_replace_string --match_string="__GITEA_URL__" --replace_string="$gitea_url" --target_file=$docker_compose_path
+ynh_replace_string --match_string="__GITEA_CLIENT_ID__" --replace_string="$gitea_client_id" --target_file=$docker_compose_path
+ynh_replace_string --match_string="__GITEA_CLIENT_SECRET__" --replace_string="$gitea_client_secret" --target_file=$docker_compose_path
+
+#=================================================
+# NGINX CONFIGURATION
+#=================================================
+ynh_script_progression --message="Configuring NGINX web server..." --time --weight=1
+
+# Create a dedicated NGINX config
+ynh_add_nginx_config "port"
+
+#=================================================
+# SETUP SYSTEMD
+#=================================================
+ynh_script_progression --message="Configuring a systemd service..." --time --weight=1
+
+# Create a dedicated systemd config
+ynh_add_systemd_config
+
+#=================================================
+# INTEGRATE SERVICE IN YUNOHOST
+#=================================================
+
+# TODO find how to extract logs
+
+ynh_script_progression --message="Integrating service in YunoHost..." --time --weight=1
+yunohost service add $app --description="Drone CI service"
+
+#=================================================
+# START SYSTEMD SERVICE
+#=================================================
+ynh_script_progression --message="Starting a systemd service..." --time --weight=1
+ynh_systemd_action --service_name=$app --action="start"
+
+#=================================================
+# SETUP SSOWAT
+#=================================================
+ynh_script_progression --message="Configuring permissions..." --time --weight=1
+
+# Make app public if necessary
+if [ $is_public -eq 1 ]
+then
+	ynh_script_progression --message="Adding public access..." --time --weight=1
+	# Everyone can access the app.
+	# The "main" permission is automatically created before the install script.
+	ynh_permission_update --permission="main" --add="visitors"
+fi
+
+# TODO make some path always accessible, for runners for example...
+
+# Reload SSOwat config
+yunohost app ssowatconf
+
+#=================================================
+# RELOAD NGINX
+#=================================================
+ynh_script_progression --message="Reloading NGINX web server..." --time --weight=1
+
+ynh_systemd_action --service_name=nginx --action=reload
+
+ynh_script_progression --message="Installation of $app completed" --time --last

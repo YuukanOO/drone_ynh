@@ -1,0 +1,12 @@
+[Unit]
+Description=Drone CI service
+Requires=docker.service
+After=docker.service
+
+[Service]
+WorkingDirectory=__FINALPATH__/
+ExecStart=/usr/local/bin/docker-compose up
+ExecStop=/usr/local/bin/docker-compose down
+
+[Install]
+WantedBy=multi-user.target
